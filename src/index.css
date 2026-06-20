@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Noto Sans SC', sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f1a 100%);
+  color: #eaeaea;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-theater-600/60 backdrop-blur-md border border-theater-400/30 rounded-2xl shadow-card;
+  }
+
+  .glass-card-hover {
+    @apply transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1 hover:border-gold-amber/30;
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 bg-gradient-to-r from-gold-amber to-gold-500 text-theater-900 font-semibold rounded-xl 
+           shadow-inner-deep transition-all duration-300 hover:shadow-gold-glow hover:scale-105
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 bg-theater-500/80 text-ivory-200 font-medium rounded-xl border border-theater-400/50
+           transition-all duration-300 hover:bg-theater-400/80 hover:border-gold-amber/30
+           active:scale-95;
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2 text-ivory-300 font-medium rounded-lg transition-all duration-200
+           hover:bg-theater-500/50 hover:text-ivory-100;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-theater-700/80 border border-theater-500/50 rounded-xl text-ivory-100
+           placeholder-ivory-400/50 transition-all duration-300 focus:outline-none focus:border-gold-amber/60
+           focus:ring-2 focus:ring-gold-amber/20;
+  }
+
+  .label-text {
+    @apply block text-sm font-medium text-ivory-300 mb-2;
+  }
+
+  .heading-serif {
+    font-family: 'Noto Serif SC', serif;
+  }
+
+  .gold-text {
+    @apply bg-gradient-to-r from-gold-200 via-gold-amber to-gold-400 bg-clip-text text-transparent;
+  }
+
+  .status-badge {
+    @apply px-3 py-1 text-xs font-medium rounded-full;
+  }
+
+  .divider {
+    @apply h-px bg-gradient-to-r from-transparent via-theater-400/50 to-transparent;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(26, 26, 46, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(245, 185, 113, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 185, 113, 0.5);
+}
