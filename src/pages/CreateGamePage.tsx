@@ -5,11 +5,12 @@ import { useGameStore } from '@/store/useGameStore';
 import { TimeSlotPicker } from '@/components/TimeSlotPicker';
 import { InviteeTag } from '@/components/InviteeTag';
 import { generatePassword } from '@/utils/idGenerator';
+import { saveVerifiedAccess } from '@/utils/storage';
 import type { TimeSlot, Invitee, PermissionMode, Gender } from '@/types';
 
 export const CreateGamePage = () => {
   const navigate = useNavigate();
-  const { createGame, setCurrentUser } = useGameStore();
+  const { createGame } = useGameStore();
 
   const [step, setStep] = useState<'form' | 'success'>('form');
   const [createdGameId, setCreatedGameId] = useState('');
@@ -27,7 +28,7 @@ export const CreateGamePage = () => {
   const [permission, setPermission] = useState<PermissionMode>('invite-only');
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
 
-  const [invitees, setInvitees] = useState<Omit<Invitee, 'id' | 'gameId' | 'seatOrder'>[]>([]);
+  const [invitees, setInvitees] = useState<Omit<Invitee, 'id' | 'gameId' | 'seatOrder' | 'reminderCount' | 'invitedById' | 'lastReminderAt'>[]>([]);
   const [newInviteeName, setNewInviteeName] = useState('');
   const [newInviteeGender, setNewInviteeGender] = useState<Gender>('unknown');
 
@@ -86,8 +87,13 @@ export const CreateGamePage = () => {
       requiredPlayers,
     });
 
-    setCurrentUser(hostName.trim(), true);
     setCreatedGameId(game.id);
+    saveVerifiedAccess({
+      gameId: game.id,
+      name: hostName.trim(),
+      isHost: true,
+      accessedAt: new Date().toISOString(),
+    });
     setStep('success');
   };
 

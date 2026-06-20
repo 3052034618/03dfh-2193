@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Users, Plus, Filter, ArrowUpDown, Copy, Check, Send, Crown } from 'lucide-react';
-import type { Game, Invitee, PlayerStatus } from '@/types';
+import { Users, Plus, Filter, ArrowUpDown, Copy, Check, Bell, Crown, UserPlus } from 'lucide-react';
+import type { Game, Invitee, PlayerStatus, Gender } from '@/types';
 import { SeatCard } from './SeatCard';
 import { useGameStore } from '@/store/useGameStore';
 
@@ -11,14 +11,193 @@ interface SeatManagerProps {
 }
 
 type FilterType = 'all' | 'confirmed' | 'tentative' | 'want-in' | 'pending';
-type SortType = 'seatOrder' | 'familiarity' | 'priority' | 'status';
+type SortType = 'seatOrder' | 'familiarity' | 'priority' | 'status' | 'reminderCount';
+
+interface InviteeEditModalProps {
+  invitee: Invitee;
+  onClose: () => void;
+  onSave: (invitee: Invitee, data: Partial<Invitee>) => void;
+}
+
+const InviteeEditModal = ({ invitee, onClose, onSave }: InviteeEditModalProps) => {
+  const [name, setName] = useState(invitee.name);
+  const [gender, setGender] = useState<Gender>(invitee.gender);
+  const [familiarity, setFamiliarity] = useState(invitee.familiarity);
+  const [priority, setPriority] = useState(invitee.priority);
+  const [role, setRole] = useState(invitee.role ?? '');
+  const [note, setNote] = useState(invitee.note ?? '');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      <div className="glass-card w-full max-w-md p-6 animate-slide-up">
+        <h3 className="text-lg font-semibold text-ivory-100 mb-4">编辑玩家信息</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="label-text">姓名</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="input-field" />
+          </div>
+          <div>
+            <label className="label-text">性别</label>
+            <select value={gender} onChange={(e) => setGender(e.target.value as Gender)} className="input-field">
+              <option value="unknown">未知</option>
+              <option value="male">男</option>
+              <option value="female">女</option>
+            </select>
+          </div>
+          <div>
+            <label className="label-text">熟悉程度 ({familiarity}/5)</label>
+            <input
+              type="range"
+              min={1}
+              max={5}
+              value={familiarity}
+              onChange={(e) => setFamiliarity(Number(e.target.value))}
+              className="w-full accent-gold-amber"
+            />
+          </div>
+          <div>
+            <label className="label-text">上车优先级 ({priority}/5)</label>
+            <input
+              type="range"
+              min={1}
+              max={5}
+              value={priority}
+              onChange={(e) => setPriority(Number(e.target.value))}
+              className="w-full accent-gold-amber"
+            />
+          </div>
+          <div>
+            <label className="label-text">分配角色</label>
+            <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="可选" className="input-field" />
+          </div>
+          <div>
+            <label className="label-text">备注</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="可选"
+              className="input-field resize-none"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="btn-secondary flex-1">
+            取消
+          </button>
+          <button
+            onClick={() =>
+              onSave(invitee, {
+                name: name.trim(),
+                gender,
+                familiarity,
+                priority,
+                role: role.trim() || undefined,
+                note: note.trim() || undefined,
+              })
+            }
+            className="btn-primary flex-1"
+          >
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface AddFriendModalProps {
+  game: Game;
+  onClose: () => void;
+  onSave: (friendName: string, inviterName: string) => void;
+}
+
+const AddFriendModal = ({ game, onClose, onSave }: AddFriendModalProps) => {
+  const [friendName, setFriendName] = useState('');
+  const [inviterName, setInviterName] = useState('');
+
+  const eligibleInviters = game.invitees.filter((inv) => {
+    const forwarded = game.invitees.filter((i) => i.invitedById === inv.id).length;
+    return forwarded < 1;
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      <div className="glass-card w-full max-w-md p-6 animate-slide-up">
+        <h3 className="text-lg font-semibold text-ivory-100 mb-2">登记转邀信息</h3>
+        <p className="text-sm text-ivory-400 mb-4">
+          此模式下每位受邀玩家最多可转邀 1 位朋友加入
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="label-text">朋友姓名</label>
+            <input
+              value={friendName}
+              onChange={(e) => setFriendName(e.target.value)}
+              placeholder="新玩家姓名"
+              className="input-field"
+            />
+          </div>
+          <div>
+            <label className="label-text">由谁转邀</label>
+            <select
+              value={inviterName}
+              onChange={(e) => setInviterName(e.target.value)}
+              className="input-field"
+            >
+              <option value="">选择转邀人...</option>
+              {eligibleInviters.map((inv) => (
+                <option key={inv.id} value={inv.name}>
+                  {inv.name}
+                </option>
+              ))}
+            </select>
+            {eligibleInviters.length === 0 && (
+              <p className="text-xs text-ivory-500 mt-1">
+                所有受邀人均已用完转邀名额
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="btn-secondary flex-1">
+            取消
+          </button>
+          <button
+            disabled={!friendName.trim() || !inviterName}
+            onClick={() => onSave(friendName.trim(), inviterName)}
+            className="btn-primary flex-1 disabled:opacity-50"
+          >
+            登记
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const SeatManager = ({ game }: SeatManagerProps) => {
-  const { addInvitee, removeInvitee, reorderInvitees, updateInviteeStatus } = useGameStore();
+  const {
+    addInvitee,
+    removeInvitee,
+    reorderInvitees,
+    updateInvitee,
+    sendReminder,
+    sendBulkReminders,
+  } = useGameStore();
+
   const [filter, setFilter] = useState<FilterType>('all');
   const [sortBy, setSortBy] = useState<SortType>('seatOrder');
   const [newInviteeName, setNewInviteeName] = useState('');
   const [copied, setCopied] = useState(false);
+  const [editingInvitee, setEditingInvitee] = useState<Invitee | null>(null);
+  const [showAddFriendModal, setShowAddFriendModal] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 2500);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -28,7 +207,7 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   const filteredInvitees = game.invitees
@@ -42,9 +221,12 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
           return b.familiarity - a.familiarity;
         case 'priority':
           return b.priority - a.priority;
-        case 'status':
+        case 'status': {
           const statusOrder = ['confirmed', 'tentative', 'want-in', 'pending'];
           return statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status);
+        }
+        case 'reminderCount':
+          return (b.reminderCount ?? 0) - (a.reminderCount ?? 0);
         case 'seatOrder':
         default:
           return a.seatOrder - b.seatOrder;
@@ -64,10 +246,11 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
 
   const handleAddInvitee = () => {
     if (!newInviteeName.trim()) return;
-    
+
     const exists = game.invitees.some((inv) => inv.name === newInviteeName.trim());
     if (exists) {
       setNewInviteeName('');
+      showToast('该玩家已存在');
       return;
     }
 
@@ -79,10 +262,61 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
       status: 'pending',
     });
     setNewInviteeName('');
+    showToast('已添加到邀请名单');
   };
 
   const handleRemoveInvitee = (id: string) => {
-    removeInvitee(game.id, id);
+    if (confirm('确定要移除该玩家吗？')) {
+      removeInvitee(game.id, id);
+    }
+  };
+
+  const handleEditInvitee = (invitee: Invitee, data: Partial<Invitee>) => {
+    updateInvitee(game.id, invitee.id, data);
+    setEditingInvitee(null);
+    showToast('玩家信息已更新');
+  };
+
+  const handleSingleReminder = (invitee: Invitee) => {
+    sendReminder(game.id, invitee.id);
+    showToast(`已提醒 ${invitee.name}`);
+  };
+
+  const handleBulkReminders = (statusFilter: FilterType) => {
+    const statuses: PlayerStatus[] =
+      statusFilter === 'all'
+        ? ['pending', 'tentative', 'want-in']
+        : ([statusFilter] as PlayerStatus[]);
+
+    const sent = sendBulkReminders(game.id, statuses);
+    if (sent > 0) {
+      showToast(`已批量提醒 ${sent} 位玩家`);
+    } else {
+      showToast('暂无可提醒的玩家');
+    }
+  };
+
+  const handleAddFriend = (friendName: string, inviterName: string) => {
+    const inviter = game.invitees.find((inv) => inv.name === inviterName);
+    if (!inviter) return;
+
+    const forwarded = game.invitees.filter((i) => i.invitedById === inviter.id).length;
+    if (forwarded >= 1) {
+      showToast(`${inviterName} 的转邀名额已用完`);
+      return;
+    }
+
+    addInvitee(game.id, {
+      name: friendName,
+      gender: 'unknown',
+      familiarity: 2,
+      priority: 4,
+      status: 'pending',
+      invitedById: inviter.id,
+    });
+
+    setShowAddFriendModal(false);
+    showToast(`${friendName} 已加入（由 ${inviterName} 转邀）`);
   };
 
   const copyInviteLink = () => {
@@ -92,15 +326,11 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const sendReminder = () => {
-    const pendingInvitees = game.invitees.filter((inv) => inv.status === 'pending');
-    alert(`已向 ${pendingInvitees.length} 位未确认的玩家发送提醒！`);
-  };
-
   const confirmedCount = game.invitees.filter((i) => i.status === 'confirmed').length;
   const tentativeCount = game.invitees.filter((i) => i.status === 'tentative').length;
   const wantInCount = game.invitees.filter((i) => i.status === 'want-in').length;
   const pendingCount = game.invitees.filter((i) => i.status === 'pending').length;
+  const remindedCount = game.invitees.filter((i) => (i.reminderCount ?? 0) > 0).length;
 
   const statusConfig: { key: FilterType; label: string; count: number; color: string }[] = [
     { key: 'all', label: '全部', count: game.invitees.length, color: 'text-ivory-300' },
@@ -111,8 +341,14 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
   ];
 
   return (
-    <div className="glass-card p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="glass-card p-6 relative">
+      {toastMsg && (
+        <div className="absolute top-4 right-4 z-10 px-4 py-2 rounded-xl bg-theater-800/90 border border-gold-amber/40 text-sm text-gold-amber animate-slide-up shadow-card">
+          {toastMsg}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gold-amber/20 flex items-center justify-center">
             <Users className="w-5 h-5 text-gold-amber" />
@@ -124,17 +360,39 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
               {confirmedCount >= game.requiredPlayers && (
                 <span className="ml-2 text-emerald-400">已满员 ✓</span>
               )}
+              {remindedCount > 0 && (
+                <span className="ml-2 text-ivory-500">· 已提醒 {remindedCount} 人</span>
+              )}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={sendReminder}
-            className="btn-secondary px-4 py-2 text-sm flex items-center gap-2"
-          >
-            <Send className="w-4 h-4" />
-            发送提醒
-          </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative group">
+            <button className="btn-secondary px-4 py-2 text-sm flex items-center gap-2">
+              <Bell className="w-4 h-4" />
+              批量提醒
+            </button>
+            <div className="absolute right-0 mt-1 w-44 bg-theater-800/95 backdrop-blur-md rounded-xl border border-theater-500/40 shadow-card overflow-hidden z-20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+              {(['all', 'pending', 'tentative', 'want-in'] as FilterType[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleBulkReminders(s)}
+                  className="w-full px-4 py-2.5 text-left text-sm text-ivory-300 hover:bg-gold-amber/10 hover:text-gold-amber transition-colors"
+                >
+                  {s === 'all' ? '所有未确认' : s === 'pending' ? '待确认' : s === 'tentative' ? '待定' : '想蹭车'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {game.permission === 'one-forward' && (
+            <button
+              onClick={() => setShowAddFriendModal(true)}
+              className="btn-secondary px-4 py-2 text-sm flex items-center gap-2"
+            >
+              <UserPlus className="w-4 h-4" />
+              登记转邀
+            </button>
+          )}
           <button
             onClick={copyInviteLink}
             className="btn-secondary px-4 py-2 text-sm flex items-center gap-2"
@@ -162,7 +420,7 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
         ))}
       </div>
 
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <div className="flex items-center gap-1 text-ivory-400">
           <ArrowUpDown className="w-4 h-4" />
           <span className="text-sm">排序：</span>
@@ -176,6 +434,7 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
           <option value="familiarity">熟悉程度</option>
           <option value="priority">上车优先级</option>
           <option value="status">报名状态</option>
+          <option value="reminderCount">提醒次数</option>
         </select>
         <div className="flex-1" />
         <Filter className="w-4 h-4 text-ivory-400" />
@@ -187,7 +446,7 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
           value={newInviteeName}
           onChange={(e) => setNewInviteeName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddInvitee())}
-          placeholder="添加新玩家..."
+          placeholder="添加新玩家姓名..."
           className="input-field flex-1 py-2 text-sm"
         />
         <button
@@ -207,18 +466,19 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
             <p>暂无玩家</p>
           </div>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={filteredInvitees.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={filteredInvitees.map((i) => i.id)}
+              strategy={verticalListSortingStrategy}
+            >
               {filteredInvitees.map((invitee) => (
                 <SeatCard
                   key={invitee.id}
                   invitee={invitee}
                   isHost={true}
                   onRemove={handleRemoveInvitee}
+                  onEdit={(inv) => setEditingInvitee(inv)}
+                  onRemind={handleSingleReminder}
                 />
               ))}
             </SortableContext>
@@ -232,6 +492,22 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
           <span className="text-sm text-ivory-400">车头：</span>
           <span className="text-sm font-medium text-gold-amber">{game.hostName}</span>
         </div>
+      )}
+
+      {editingInvitee && (
+        <InviteeEditModal
+          invitee={editingInvitee}
+          onClose={() => setEditingInvitee(null)}
+          onSave={handleEditInvitee}
+        />
+      )}
+
+      {showAddFriendModal && (
+        <AddFriendModal
+          game={game}
+          onClose={() => setShowAddFriendModal(false)}
+          onSave={handleAddFriend}
+        />
       )}
     </div>
   );

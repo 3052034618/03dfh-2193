@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, X, User, Star } from 'lucide-react';
+import { GripVertical, X, User, Star, Bell, Edit3 } from 'lucide-react';
 import type { Invitee } from '@/types';
 import { StatusBadge } from './StatusBadge';
 
@@ -9,9 +9,10 @@ interface SeatCardProps {
   isHost?: boolean;
   onRemove?: (id: string) => void;
   onEdit?: (invitee: Invitee) => void;
+  onRemind?: (invitee: Invitee) => void;
 }
 
-export const SeatCard = ({ invitee, isHost = false, onRemove, onEdit }: SeatCardProps) => {
+export const SeatCard = ({ invitee, isHost = false, onRemove, onEdit, onRemind }: SeatCardProps) => {
   const {
     attributes,
     listeners,
@@ -31,6 +32,18 @@ export const SeatCard = ({ invitee, isHost = false, onRemove, onEdit }: SeatCard
     male: 'from-blue-500 to-blue-600',
     female: 'from-pink-500 to-pink-600',
     unknown: 'from-ivory-400 to-ivory-500',
+  };
+
+  const formatLastReminder = (iso?: string) => {
+    if (!iso) return '';
+    const date = new Date(iso);
+    const diff = Date.now() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return '刚刚';
+    if (minutes < 60) return `${minutes}分钟前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}小时前`;
+    return `${Math.floor(hours / 24)}天前`;
   };
 
   return (
@@ -58,8 +71,17 @@ export const SeatCard = ({ invitee, isHost = false, onRemove, onEdit }: SeatCard
           <div className="flex items-center gap-2 mb-1">
             <h4 className="font-medium text-ivory-100 truncate">{invitee.name}</h4>
             <StatusBadge status={invitee.status} type="player" />
+            {isHost && (invitee.reminderCount ?? 0) > 0 && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gold-amber/15 text-gold-amber border border-gold-amber/20"
+                title={`已提醒${invitee.reminderCount}次，上次${formatLastReminder(invitee.lastReminderAt)}`}
+              >
+                <Bell className="w-3 h-3" />
+                {invitee.reminderCount}
+              </span>
+            )}
           </div>
-          
+
           <div className="flex items-center gap-2 text-xs text-ivory-400">
             {invitee.role && (
               <span className="px-2 py-0.5 rounded bg-theater-500/50 text-gold-amber">
@@ -68,26 +90,45 @@ export const SeatCard = ({ invitee, isHost = false, onRemove, onEdit }: SeatCard
             )}
             <div className="flex items-center gap-0.5">
               <Star className="w-3 h-3 text-gold-amber fill-gold-amber" />
-              <span>{invitee.familiarity}</span>
+              <span>熟悉度 {invitee.familiarity}</span>
             </div>
+            <span className="text-ivory-500">·</span>
+            <span>优先级 {invitee.priority}</span>
           </div>
 
           {invitee.note && (
             <p className="text-xs text-ivory-500 mt-1 truncate">{invitee.note}</p>
           )}
+
+          {isHost && invitee.lastReminderAt && (
+            <p className="text-xs text-ivory-500 mt-1">
+              上次提醒：{formatLastReminder(invitee.lastReminderAt)}
+            </p>
+          )}
         </div>
 
         {isHost && (
           <div className="flex items-center gap-1">
+            {invitee.status !== 'confirmed' && (
+              <button
+                onClick={() => onRemind?.(invitee)}
+                className="p-1.5 rounded-lg text-ivory-400 hover:text-gold-amber hover:bg-gold-amber/10 transition-colors"
+                title="单独提醒"
+              >
+                <Bell className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={() => onEdit?.(invitee)}
               className="p-1.5 rounded-lg text-ivory-400 hover:text-gold-amber hover:bg-theater-500/50 transition-colors"
+              title="编辑"
             >
-              <Star className="w-4 h-4" />
+              <Edit3 className="w-4 h-4" />
             </button>
             <button
               onClick={() => onRemove?.(invitee.id)}
               className="p-1.5 rounded-lg text-ivory-400 hover:text-accent-500 hover:bg-accent-500/10 transition-colors"
+              title="移除"
             >
               <X className="w-4 h-4" />
             </button>

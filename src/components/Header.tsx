@@ -1,10 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Dices, Home, Plus, User } from 'lucide-react';
-import { useGameStore } from '@/store/useGameStore';
+import { Dices, Home, Plus } from 'lucide-react';
 
 export const Header = () => {
   const navigate = useNavigate();
-  const { currentUser } = useGameStore();
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-lg bg-theater-900/80 border-b border-theater-600/30">
@@ -34,19 +32,6 @@ export const Header = () => {
             <Plus className="w-4 h-4" />
             <span className="text-sm font-medium">创建车局</span>
           </button>
-          {currentUser && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-theater-600/50">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-gold-amber to-gold-500 flex items-center justify-center">
-                <User className="w-4 h-4 text-theater-900" />
-              </div>
-              <span className="text-sm text-ivory-200">{currentUser.name}</span>
-              {currentUser.isHost && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-accent-500/20 text-accent-500 border border-accent-500/30">
-                  车头
-                </span>
-              )}
-            </div>
-          )}
         </nav>
       </div>
     </header>

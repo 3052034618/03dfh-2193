@@ -24,6 +24,9 @@ export interface Invitee {
   role?: string;
   seatOrder: number;
   note?: string;
+  reminderCount: number;
+  lastReminderAt?: string;
+  invitedById?: string;
 }
 
 export interface Game {
@@ -42,6 +45,7 @@ export interface Game {
   timeSlots: TimeSlot[];
   invitees: Invitee[];
   requiredPlayers: number;
+  roleRequirements?: string[];
 }
 
 export interface CreateGameData {
@@ -55,11 +59,14 @@ export interface CreateGameData {
   hostName: string;
   notes?: string;
   timeSlots: Omit<TimeSlot, 'id'>[];
-  invitees: Omit<Invitee, 'id' | 'gameId' | 'seatOrder'>[];
+  invitees: Omit<Invitee, 'id' | 'gameId' | 'seatOrder' | 'reminderCount' | 'invitedById' | 'lastReminderAt'>[];
   requiredPlayers: number;
+  roleRequirements?: string[];
 }
 
-export interface CurrentUser {
+export interface VerifiedGameAccess {
+  gameId: string;
   name: string;
   isHost: boolean;
+  accessedAt: string;
 }
