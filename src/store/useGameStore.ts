@@ -43,6 +43,7 @@ interface GameStore {
   getInviteeByName: (gameId: string, name: string) => Invitee | undefined;
   getForwardedCountByInviter: (gameId: string, inviterName: string) => number;
   canForwardInvite: (gameId: string, inviterName: string) => { can: boolean; reason?: string };
+  confirmGame: (gameId: string) => void;
 }
 
 const mockGames: Game[] = [
@@ -56,6 +57,7 @@ const mockGames: Game[] = [
     password: '1234',
     permission: 'invite-only',
     hostName: '阿明',
+    contactInfo: '微信: aming_jb',
     status: 'recruiting',
     createdAt: new Date().toISOString(),
     notes: '本周六晚，记得带脑子来',
@@ -83,6 +85,7 @@ const mockGames: Game[] = [
     password: '5678',
     permission: 'one-forward',
     hostName: '小薇',
+    contactInfo: '手机: 138****6789',
     status: 'recruiting',
     createdAt: new Date(Date.now() - 86400000).toISOString(),
     notes: '需要哭戏好的玩家',
@@ -151,6 +154,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       password: data.password,
       permission: data.permission,
       hostName: data.hostName,
+      contactInfo: data.contactInfo,
       status: 'recruiting',
       createdAt: new Date().toISOString(),
       notes: data.notes,
@@ -419,5 +423,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return { can: false, reason: '你的转邀名额已用完（每位受邀玩家最多带1位朋友）' };
     }
     return { can: true };
+  },
+
+  confirmGame: (gameId: string) => {
+    set((state) => {
+      const newGames = state.games.map((game) =>
+        game.id === gameId ? { ...game, status: 'confirmed' as const } : game,
+      );
+      saveGames(newGames);
+      return { games: newGames };
+    });
   },
 }));

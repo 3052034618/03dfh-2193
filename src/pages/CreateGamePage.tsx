@@ -23,6 +23,7 @@ export const CreateGamePage = () => {
   const [price, setPrice] = useState(100);
   const [requiredPlayers, setRequiredPlayers] = useState(6);
   const [hostName, setHostName] = useState('');
+  const [contactInfo, setContactInfo] = useState('');
   const [notes, setNotes] = useState('');
   const [password, setPassword] = useState(generatePassword());
   const [permission, setPermission] = useState<PermissionMode>('invite-only');
@@ -81,6 +82,7 @@ export const CreateGamePage = () => {
       password,
       permission,
       hostName: hostName.trim(),
+      contactInfo: contactInfo.trim() || undefined,
       notes: notes.trim() || undefined,
       timeSlots: timeSlots.map((ts) => ({ date: ts.date, time: ts.time, isSelected: ts.isSelected })),
       invitees,
@@ -405,20 +407,35 @@ export const CreateGamePage = () => {
               你的信息
             </h2>
 
-            <div>
-              <label className="label-text">你的名字 *</label>
-              <input
-                type="text"
-                value={hostName}
-                onChange={(e) => setHostName(e.target.value)}
-                placeholder="作为车头，你的名字"
-                className="input-field"
-                required
-              />
-              <p className="text-xs text-ivory-500 mt-1">
-                <Users className="w-3 h-3 inline mr-1" />
-                你将作为该车局的车头（组织者）
-              </p>
+            <div className="space-y-4">
+              <div>
+                <label className="label-text">你的名字 *</label>
+                <input
+                  type="text"
+                  value={hostName}
+                  onChange={(e) => setHostName(e.target.value)}
+                  placeholder="作为车头，你的名字"
+                  className="input-field"
+                  required
+                />
+                <p className="text-xs text-ivory-500 mt-1">
+                  <Users className="w-3 h-3 inline mr-1" />
+                  你将作为该车局的车头（组织者）
+                </p>
+              </div>
+              <div>
+                <label className="label-text">对外联系方式</label>
+                <input
+                  type="text"
+                  value={contactInfo}
+                  onChange={(e) => setContactInfo(e.target.value)}
+                  placeholder="如：微信号 xxx 或手机 138****6789"
+                  className="input-field"
+                />
+                <p className="text-xs text-ivory-500 mt-1">
+                  玩家进入后仅可看到此联系信息
+                </p>
+              </div>
             </div>
           </div>
 

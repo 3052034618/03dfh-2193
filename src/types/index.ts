@@ -39,6 +39,7 @@ export interface Game {
   password: string;
   permission: PermissionMode;
   hostName: string;
+  contactInfo?: string;
   status: GameStatus;
   createdAt: string;
   notes?: string;
@@ -57,6 +58,7 @@ export interface CreateGameData {
   password: string;
   permission: PermissionMode;
   hostName: string;
+  contactInfo?: string;
   notes?: string;
   timeSlots: Omit<TimeSlot, 'id'>[];
   invitees: Omit<Invitee, 'id' | 'gameId' | 'seatOrder' | 'reminderCount' | 'invitedById' | 'lastReminderAt'>[];

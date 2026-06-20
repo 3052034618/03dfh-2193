@@ -18,13 +18,16 @@ import {
   UserPlus,
   Check,
   X,
+  CheckCircle,
+  Phone,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { PasswordModal } from '@/components/PasswordModal';
 import { SeatManager } from '@/components/SeatManager';
 import { PlayerStatusSelector } from '@/components/PlayerStatusSelector';
 import { StatusBadge } from '@/components/StatusBadge';
-import type { PlayerStatus, VerifiedGameAccess } from '@/types';
+import type { PlayerStatus, VerifiedGameAccess, Game } from '@/types';
 
 export const GameDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,12 +44,16 @@ export const GameDetailPage = () => {
     clearMyGameAccess,
     addInvitee,
     canForwardInvite,
+    confirmGame,
+    updateGame,
   } = useGameStore();
 
   const [passwordError, setPasswordError] = useState('');
   const [, forceUpdate] = useState(0);
   const [friendName, setFriendName] = useState('');
   const [showForwardSuccess, setShowForwardSuccess] = useState(false);
+  const [editingContact, setEditingContact] = useState(false);
+  const [contactInput, setContactInput] = useState('');
 
   const game = games.find((g) => g.id === gameId);
   const verifiedAccess: VerifiedGameAccess | null = gameId ? getVerifiedUserForGame(gameId) : null;
@@ -59,14 +66,11 @@ export const GameDetailPage = () => {
 
   const handlePasswordSubmit = (name: string, password: string) => {
     if (!game) return;
-
     const result = verifyAndEnterGame(game.id, name, password);
-
     if (result.success === false) {
       setPasswordError(result.error);
       return;
     }
-
     setPasswordError('');
     forceUpdate((n) => n + 1);
   };
@@ -85,19 +89,16 @@ export const GameDetailPage = () => {
 
   const handleForwardInvite = () => {
     if (!game || !myInvitee || !friendName.trim()) return;
-
     const check = canForwardInvite(game.id, myInvitee.name);
     if (!check.can) {
       alert(check.reason ?? '暂不可转邀');
       return;
     }
-
     const exists = game.invitees.some((inv) => inv.name === friendName.trim());
     if (exists) {
       alert('该朋友已在名单中');
       return;
     }
-
     addInvitee(game.id, {
       name: friendName.trim(),
       gender: 'unknown',
@@ -106,10 +107,24 @@ export const GameDetailPage = () => {
       status: 'pending',
       invitedById: myInvitee.id,
     });
-
     setFriendName('');
     setShowForwardSuccess(true);
     setTimeout(() => setShowForwardSuccess(false), 3000);
+    forceUpdate((n) => n + 1);
+  };
+
+  const handleConfirmGame = () => {
+    if (!game) return;
+    if (confirm('确认将此车局标记为已成局？')) {
+      confirmGame(game.id);
+      forceUpdate((n) => n + 1);
+    }
+  };
+
+  const handleSaveContact = () => {
+    if (!game) return;
+    updateGame(game.id, { contactInfo: contactInput.trim() || undefined });
+    setEditingContact(false);
     forceUpdate((n) => n + 1);
   };
 
@@ -122,9 +137,7 @@ export const GameDetailPage = () => {
           </div>
           <h2 className="text-2xl font-bold text-ivory-200 mb-2">车局不存在</h2>
           <p className="text-ivory-400 mb-6">该车局可能已被删除或链接无效</p>
-          <button onClick={() => navigate('/')} className="btn-primary">
-            返回首页
-          </button>
+          <button onClick={() => navigate('/')} className="btn-primary">返回首页</button>
         </div>
       </div>
     );
@@ -154,6 +167,9 @@ export const GameDetailPage = () => {
 
   const firstSlot = game.timeSlots.find((ts) => ts.isSelected) || game.timeSlots[0];
   const confirmedCount = game.invitees.filter((i) => i.status === 'confirmed').length;
+  const tentativeCount = game.invitees.filter((i) => i.status === 'tentative').length;
+  const wantInCount = game.invitees.filter((i) => i.status === 'want-in').length;
+  const pendingCount = game.invitees.filter((i) => i.status === 'pending').length;
   const remaining = Math.max(0, game.requiredPlayers - confirmedCount);
   const progressPct = Math.min((confirmedCount / game.requiredPlayers) * 100, 100);
 
@@ -161,14 +177,16 @@ export const GameDetailPage = () => {
   const assignedRoles = game.invitees
     .filter((inv) => inv.role && inv.status === 'confirmed')
     .map((inv) => inv.role as string);
-
   const unfilledRoles = roleRequirements.filter((r) => !assignedRoles.includes(r));
 
   const myRole = myInvitee?.role;
   const myStatus = myInvitee?.status;
 
+  const isOriginalInvitee = myInvitee && !myInvitee.invitedById;
   const forwardCheck =
-    game && myInvitee ? canForwardInvite(game.id, myInvitee.name) : { can: false };
+    game && myInvitee && isOriginalInvitee
+      ? canForwardInvite(game.id, myInvitee.name)
+      : { can: false, reason: '你是由朋友转邀进入的' };
 
   return (
     <div className="min-h-screen py-8 px-4">
@@ -245,14 +263,16 @@ export const GameDetailPage = () => {
                   <StatusBadge status={myStatus} type="player" />
                 </div>
               )}
-              <div className="text-xs text-ivory-500">
-                权限模式：
-                {game.permission === 'invite-only' ? (
-                  <span className="text-ivory-400">仅受邀可进</span>
-                ) : (
-                  <span className="text-ivory-400">可转邀1位</span>
-                )}
-              </div>
+              {isHostView && (
+                <div className="text-xs text-ivory-500">
+                  权限模式：
+                  {game.permission === 'invite-only' ? (
+                    <span className="text-ivory-400">仅受邀可进</span>
+                  ) : (
+                    <span className="text-ivory-400">可转邀1位</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -284,7 +304,50 @@ export const GameDetailPage = () => {
         </div>
 
         {isHostView ? (
-          <div className="animate-fade-in">
+          <div className="space-y-6 animate-fade-in">
+            <GameDashboard game={game} onConfirmGame={handleConfirmGame} />
+
+            <div className="glass-card p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Phone className="w-4 h-4 text-gold-amber" />
+                <h3 className="text-base font-semibold text-ivory-100">对外联系方式</h3>
+              </div>
+              {editingContact ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={contactInput}
+                    onChange={(e) => setContactInput(e.target.value)}
+                    placeholder="如：微信号 xxx 或手机 138****6789"
+                    className="input-field flex-1 py-2 text-sm"
+                    autoFocus
+                  />
+                  <button onClick={handleSaveContact} className="btn-primary px-4 py-2 text-sm">
+                    保存
+                  </button>
+                  <button onClick={() => setEditingContact(false)} className="btn-secondary px-4 py-2 text-sm">
+                    取消
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-ivory-300">
+                    {game.contactInfo || '未设置'}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setContactInput(game.contactInfo ?? '');
+                      setEditingContact(true);
+                    }}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-theater-600/50 text-ivory-400 hover:text-gold-amber hover:bg-theater-500/50 transition-colors"
+                  >
+                    {game.contactInfo ? '修改' : '设置'}
+                  </button>
+                </div>
+              )}
+              <p className="text-xs text-ivory-500 mt-2">玩家进入后仅可看到此联系信息，不会看到店家、人均等详情</p>
+            </div>
+
             <SeatManager game={game} />
           </div>
         ) : verifiedAccess && myInvitee ? (
@@ -367,7 +430,7 @@ export const GameDetailPage = () => {
                     </div>
                     <div className="h-2.5 bg-theater-700 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-500"
+                        className={`h-full rounded-full transition-all duration-500 ${game.status === 'confirmed' ? 'bg-gradient-to-r from-gold-amber to-gold-500' : 'bg-gradient-to-r from-emerald-500 to-emerald-400'}`}
                         style={{ width: `${progressPct}%` }}
                       />
                     </div>
@@ -389,10 +452,17 @@ export const GameDetailPage = () => {
                       <p className="text-xl font-bold text-accent-500">{remaining}</p>
                     </div>
                   </div>
+
+                  {game.status === 'confirmed' && (
+                    <div className="mt-2 p-3 rounded-lg bg-gold-amber/15 border border-gold-amber/30 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-gold-amber flex-shrink-0" />
+                      <span className="text-sm font-medium text-gold-amber">已成局！准备开本吧~</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {game.permission === 'one-forward' && (
+              {isOriginalInvitee && game.permission === 'one-forward' && (
                 <div className={`glass-card p-6 transition-all ${!forwardCheck.can ? 'opacity-60' : ''}`}>
                   <div className="flex items-center gap-2 mb-4">
                     <UserPlus className={`w-4 h-4 ${forwardCheck.can ? 'text-gold-amber' : 'text-ivory-500'}`} />
@@ -445,7 +515,7 @@ export const GameDetailPage = () => {
                       </div>
                       <div className="flex items-center justify-center gap-1.5 text-xs text-ivory-500">
                         <span className="inline-block w-2 h-2 rounded-full bg-ivory-500"></span>
-                        <span>转邀名额已用完或无权限</span>
+                        <span>转邀名额已用完</span>
                       </div>
                     </div>
                   )}
@@ -455,9 +525,9 @@ export const GameDetailPage = () => {
               <div className="glass-card p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Crown className="w-4 h-4 text-gold-amber" />
-                  <h3 className="text-base font-semibold text-ivory-100">车头信息</h3>
+                  <h3 className="text-base font-semibold text-ivory-100">车头联系</h3>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 mb-2">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-amber to-gold-500 flex items-center justify-center">
                     <span className="text-theater-900 font-bold">
                       {game.hostName.charAt(0)}
@@ -465,32 +535,150 @@ export const GameDetailPage = () => {
                   </div>
                   <div>
                     <p className="font-semibold text-ivory-100">{game.hostName}</p>
-                    <p className="text-xs text-ivory-500">有问题请联系车头</p>
+                    {game.contactInfo ? (
+                      <p className="text-sm text-gold-amber">{game.contactInfo}</p>
+                    ) : (
+                      <p className="text-xs text-ivory-500">暂无联系方式</p>
+                    )}
                   </div>
                 </div>
-              </div>
-
-              <div className="glass-card p-6 bg-gradient-to-br from-gold-amber/5 to-transparent border-gold-amber/20">
-                <h3 className="text-base font-semibold text-ivory-100 mb-2">报名状态说明</h3>
-                <ul className="text-xs text-ivory-400 space-y-1.5">
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400">能来</span>
-                    <span>确定时间没问题，准时到场</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-400">待定</span>
-                    <span>基本可以，等确认一下时间</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-purple-400">想蹭车</span>
-                    <span>时间不太稳，但很想参加</span>
-                  </li>
-                </ul>
               </div>
             </div>
           </div>
         ) : null}
       </div>
+    </div>
+  );
+};
+
+const GameDashboard = ({ game, onConfirmGame }: { game: Game; onConfirmGame: () => void }) => {
+  const confirmedList = game.invitees.filter((i) => i.status === 'confirmed');
+  const tentativeList = game.invitees.filter((i) => i.status === 'tentative');
+  const wantInList = game.invitees.filter((i) => i.status === 'want-in');
+  const pendingList = game.invitees.filter((i) => i.status === 'pending');
+
+  const confirmedCount = confirmedList.length;
+  const remaining = Math.max(0, game.requiredPlayers - confirmedCount);
+  const progressPct = Math.min((confirmedCount / game.requiredPlayers) * 100, 100);
+
+  const roleRequirements = game.roleRequirements ?? [];
+  const assignedRoles = game.invitees
+    .filter((inv) => inv.role && inv.status === 'confirmed')
+    .map((inv) => inv.role as string);
+  const unfilledRoles = roleRequirements.filter((r) => !assignedRoles.includes(r));
+
+  const statusGroups = [
+    { key: 'confirmed', label: '已确认', list: confirmedList, color: 'emerald', icon: <UserCheck className="w-3.5 h-3.5" /> },
+    { key: 'tentative', label: '待定', list: tentativeList, color: 'amber', icon: <AlertTriangle className="w-3.5 h-3.5" /> },
+    { key: 'want-in', label: '想蹭车', list: wantInList, color: 'purple', icon: <Sparkles className="w-3.5 h-3.5" /> },
+    { key: 'pending', label: '未回应', list: pendingList, color: 'slate', icon: <UserX className="w-3.5 h-3.5" /> },
+  ];
+
+  const colorMap: Record<string, string> = {
+    emerald: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400',
+    amber: 'bg-amber-500/15 border-amber-500/30 text-amber-400',
+    purple: 'bg-purple-500/15 border-purple-500/30 text-purple-400',
+    slate: 'bg-theater-600/50 border-theater-500/40 text-ivory-400',
+  };
+
+  return (
+    <div className="glass-card p-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gold-amber/20 flex items-center justify-center">
+            <LayoutDashboard className="w-5 h-5 text-gold-amber" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-ivory-100">成局看板</h2>
+            <p className="text-sm text-ivory-400">
+              已确认 <span className="text-emerald-400 font-medium">{confirmedCount}</span>/{game.requiredPlayers} 人
+              {remaining > 0 && <span className="text-accent-500 ml-2">还差 {remaining} 人</span>}
+              {remaining === 0 && <span className="text-emerald-400 ml-2">已满员 ✓</span>}
+            </p>
+          </div>
+        </div>
+        {game.status === 'recruiting' && confirmedCount >= game.requiredPlayers && (
+          <button
+            onClick={onConfirmGame}
+            className="btn-primary px-5 py-2.5 text-sm flex items-center gap-2"
+          >
+            <CheckCircle className="w-4 h-4" />
+            确认成局
+          </button>
+        )}
+        {game.status === 'confirmed' && (
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gold-amber/15 border border-gold-amber/30">
+            <CheckCircle className="w-4 h-4 text-gold-amber" />
+            <span className="text-sm font-medium text-gold-amber">已成局</span>
+          </div>
+        )}
+      </div>
+
+      <div className="mb-6">
+        <div className="flex justify-between text-sm mb-2">
+          <span className="text-ivory-400">成局进度</span>
+          <span className="text-ivory-300">{Math.round(progressPct)}%</span>
+        </div>
+        <div className="h-3 bg-theater-700 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${game.status === 'confirmed' ? 'bg-gradient-to-r from-gold-amber to-gold-500' : 'bg-gradient-to-r from-emerald-500 to-emerald-400'}`}
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        {statusGroups.map((group) => (
+          <div key={group.key} className={`p-3 rounded-xl border ${colorMap[group.color]}`}>
+            <div className="flex items-center gap-1.5 mb-1">
+              {group.icon}
+              <span className="text-xs font-medium">{group.label}</span>
+            </div>
+            <p className="text-2xl font-bold">{group.list.length}</p>
+            <div className="mt-1.5 space-y-0.5">
+              {group.list.slice(0, 3).map((inv) => (
+                <p key={inv.id} className="text-xs opacity-80 truncate">
+                  {inv.name}{inv.role ? ` · ${inv.role}` : ''}
+                </p>
+              ))}
+              {group.list.length > 3 && (
+                <p className="text-xs opacity-50">+{group.list.length - 3} 更多</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {roleRequirements.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-ivory-300 mb-3">角色分配情况</h3>
+          <div className="flex flex-wrap gap-2">
+            {roleRequirements.map((role) => {
+              const filled = assignedRoles.includes(role);
+              const filler = game.invitees.find((inv) => inv.role === role && inv.status === 'confirmed');
+              return (
+                <div
+                  key={role}
+                  className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2
+                    ${filled
+                      ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
+                      : 'bg-accent-500/10 border border-accent-500/25 text-accent-500'
+                    }`}
+                >
+                  {filled ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
+                  <span className="font-medium">{role}</span>
+                  {filler && <span className="text-xs opacity-60">({filler.name})</span>}
+                </div>
+              );
+            })}
+          </div>
+          {unfilledRoles.length > 0 && (
+            <p className="text-xs text-accent-500 mt-2">
+              ⚠ {unfilledRoles.length} 个角色尚无人接：{unfilledRoles.join('、')}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 };
