@@ -115,10 +115,11 @@ interface AddFriendModalProps {
 const AddFriendModal = ({ game, onClose, onSave }: AddFriendModalProps) => {
   const [friendName, setFriendName] = useState('');
   const [inviterName, setInviterName] = useState('');
+  const { canForwardInvite } = useGameStore();
 
   const eligibleInviters = game.invitees.filter((inv) => {
-    const forwarded = game.invitees.filter((i) => i.invitedById === inv.id).length;
-    return forwarded < 1;
+    const { can } = canForwardInvite(game.id, inv.name);
+    return can;
   });
 
   return (
@@ -184,6 +185,7 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
     updateInvitee,
     sendReminder,
     sendBulkReminders,
+    canForwardInvite,
   } = useGameStore();
 
   const [filter, setFilter] = useState<FilterType>('all');
@@ -297,14 +299,14 @@ export const SeatManager = ({ game }: SeatManagerProps) => {
   };
 
   const handleAddFriend = (friendName: string, inviterName: string) => {
-    const inviter = game.invitees.find((inv) => inv.name === inviterName);
-    if (!inviter) return;
-
-    const forwarded = game.invitees.filter((i) => i.invitedById === inviter.id).length;
-    if (forwarded >= 1) {
-      showToast(`${inviterName} 的转邀名额已用完`);
+    const check = canForwardInvite(game.id, inviterName);
+    if (!check.can) {
+      showToast(check.reason ?? `${inviterName} 暂不可转邀`);
       return;
     }
+
+    const inviter = game.invitees.find((inv) => inv.name === inviterName);
+    if (!inviter) return;
 
     addInvitee(game.id, {
       name: friendName,

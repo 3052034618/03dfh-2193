@@ -42,6 +42,7 @@ interface GameStore {
   clearMyGameAccess: (gameId: string) => void;
   getInviteeByName: (gameId: string, name: string) => Invitee | undefined;
   getForwardedCountByInviter: (gameId: string, inviterName: string) => number;
+  canForwardInvite: (gameId: string, inviterName: string) => { can: boolean; reason?: string };
 }
 
 const mockGames: Game[] = [
@@ -395,5 +396,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const inviter = game.invitees.find((inv) => inv.name === inviterName);
     if (!inviter) return 0;
     return game.invitees.filter((inv) => inv.invitedById === inviter.id).length;
+  },
+
+  canForwardInvite: (gameId: string, inviterName: string) => {
+    const game = get().getGame(gameId);
+    if (!game) return { can: false, reason: '车局不存在' };
+    if (game.permission !== 'one-forward') {
+      return { can: false, reason: '本模式下不可转邀' };
+    }
+    if (inviterName === game.hostName) {
+      return { can: false, reason: '车头不需要转邀' };
+    }
+    const inviter = game.invitees.find((inv) => inv.name === inviterName);
+    if (!inviter) {
+      return { can: false, reason: '你不在邀请名单中' };
+    }
+    if (inviter.invitedById) {
+      return { can: false, reason: '你是由朋友转邀进入的，不能再继续转邀他人' };
+    }
+    const count = get().getForwardedCountByInviter(gameId, inviterName);
+    if (count >= 1) {
+      return { can: false, reason: '你的转邀名额已用完（每位受邀玩家最多带1位朋友）' };
+    }
+    return { can: true };
   },
 }));

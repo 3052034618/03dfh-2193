@@ -15,6 +15,9 @@ import {
   Sparkles,
   UserCheck,
   UserX,
+  UserPlus,
+  Check,
+  X,
 } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { PasswordModal } from '@/components/PasswordModal';
@@ -36,11 +39,14 @@ export const GameDetailPage = () => {
     getMyInviteeInGame,
     updateInviteeStatus,
     clearMyGameAccess,
+    addInvitee,
+    canForwardInvite,
   } = useGameStore();
 
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [, forceUpdate] = useState(0);
+  const [friendName, setFriendName] = useState('');
+  const [showForwardSuccess, setShowForwardSuccess] = useState(false);
 
   const game = useMemo(() => games.find((g) => g.id === gameId), [games, gameId]);
 
@@ -63,14 +69,6 @@ export const GameDetailPage = () => {
     init();
   }, [init]);
 
-  useEffect(() => {
-    if (game && !verifiedAccess) {
-      setShowPasswordModal(true);
-    } else if (verifiedAccess) {
-      setShowPasswordModal(false);
-    }
-  }, [game, verifiedAccess]);
-
   const handlePasswordSubmit = (name: string, password: string) => {
     if (!game) return;
 
@@ -82,7 +80,6 @@ export const GameDetailPage = () => {
     }
 
     setPasswordError('');
-    setShowPasswordModal(false);
     forceUpdate((n) => n + 1);
   };
 
@@ -96,7 +93,36 @@ export const GameDetailPage = () => {
     if (!game) return;
     clearMyGameAccess(game.id);
     forceUpdate((n) => n + 1);
-    setShowPasswordModal(true);
+  };
+
+  const handleForwardInvite = () => {
+    if (!game || !myInvitee || !friendName.trim()) return;
+
+    const check = canForwardInvite(game.id, myInvitee.name);
+    if (!check.can) {
+      alert(check.reason ?? '暂不可转邀');
+      return;
+    }
+
+    const exists = game.invitees.some((inv) => inv.name === friendName.trim());
+    if (exists) {
+      alert('该朋友已在名单中');
+      return;
+    }
+
+    addInvitee(game.id, {
+      name: friendName.trim(),
+      gender: 'unknown',
+      familiarity: 2,
+      priority: 4,
+      status: 'pending',
+      invitedById: myInvitee.id,
+    });
+
+    setFriendName('');
+    setShowForwardSuccess(true);
+    setTimeout(() => setShowForwardSuccess(false), 3000);
+    forceUpdate((n) => n + 1);
   };
 
   if (!game) {
@@ -116,6 +142,28 @@ export const GameDetailPage = () => {
     );
   }
 
+  if (!verifiedAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-theater-900 via-theater-800 to-theater-900">
+        <div className="max-w-md w-full text-center mb-8">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-gold-amber to-gold-500 flex items-center justify-center shadow-gold-glow">
+            <Theater className="w-10 h-10 text-theater-900" />
+          </div>
+          <h1 className="text-2xl font-bold heading-serif gold-text mb-2">私密车局</h1>
+          <p className="text-ivory-400 text-sm">请验证身份以查看详情</p>
+        </div>
+        <PasswordModal
+          isOpen={true}
+          onClose={() => navigate('/')}
+          onSubmit={handlePasswordSubmit}
+          error={passwordError}
+          title="进入私密车局"
+          standalone
+        />
+      </div>
+    );
+  }
+
   const firstSlot = game.timeSlots.find((ts) => ts.isSelected) || game.timeSlots[0];
   const confirmedCount = game.invitees.filter((i) => i.status === 'confirmed').length;
   const remaining = Math.max(0, game.requiredPlayers - confirmedCount);
@@ -130,6 +178,11 @@ export const GameDetailPage = () => {
 
   const myRole = myInvitee?.role;
   const myStatus = myInvitee?.status;
+
+  const forwardCheck = useMemo(() => {
+    if (!game || !myInvitee) return { can: false };
+    return canForwardInvite(game.id, myInvitee.name);
+  }, [games, game, myInvitee, canForwardInvite]);
 
   return (
     <div className="min-h-screen py-8 px-4">
@@ -174,18 +227,28 @@ export const GameDetailPage = () => {
                   <Clock className="w-4 h-4 text-gold-amber flex-shrink-0" />
                   <span>{game.duration} 小时</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-ivory-300">
-                  <MapPin className="w-4 h-4 text-gold-amber flex-shrink-0" />
-                  <span className="truncate">{game.store || '待定'}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-ivory-300">
-                  <DollarSign className="w-4 h-4 text-gold-amber flex-shrink-0" />
-                  <span>¥{game.price}/人</span>
-                </div>
+                {isHostView && (
+                  <>
+                    <div className="flex items-center gap-2 text-sm text-ivory-300">
+                      <MapPin className="w-4 h-4 text-gold-amber flex-shrink-0" />
+                      <span className="truncate">{game.store || '待定'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-ivory-300">
+                      <DollarSign className="w-4 h-4 text-gold-amber flex-shrink-0" />
+                      <span>¥{game.price}/人</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex items-center gap-2 text-sm text-ivory-300">
                   <Users className="w-4 h-4 text-gold-amber flex-shrink-0" />
                   <span>{confirmedCount}/{game.requiredPlayers} 人</span>
                 </div>
+                {!isHostView && (
+                  <div className="md:col-span-2 flex items-center gap-2 text-sm text-ivory-300">
+                    <BookOpen className="w-4 h-4 text-gold-amber flex-shrink-0" />
+                    <span>{firstSlot?.date} {firstSlot?.time}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -213,7 +276,7 @@ export const GameDetailPage = () => {
             </div>
           </div>
 
-          {firstSlot && (
+          {isHostView && firstSlot && (
             <div className="mt-4 pt-4 border-t border-theater-500/30">
               <div className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-gold-amber" />
@@ -230,7 +293,7 @@ export const GameDetailPage = () => {
             </div>
           )}
 
-          {game.notes && (
+          {isHostView && game.notes && (
             <div className="mt-4 p-4 bg-theater-700/50 rounded-xl">
               <div className="flex items-start gap-2">
                 <Info className="w-4 h-4 text-gold-amber mt-0.5 flex-shrink-0" />
@@ -349,6 +412,62 @@ export const GameDetailPage = () => {
                 </div>
               </div>
 
+              {game.permission === 'one-forward' && (
+                <div className="glass-card p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <UserPlus className="w-4 h-4 text-gold-amber" />
+                    <h3 className="text-base font-semibold text-ivory-100">带朋友加入</h3>
+                  </div>
+
+                  {showForwardSuccess && (
+                    <div className="mb-4 p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center gap-2 animate-fade-in">
+                      <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      <span className="text-sm text-emerald-400">转邀成功！朋友已加入车局</span>
+                    </div>
+                  )}
+
+                  {forwardCheck.can ? (
+                    <div className="space-y-3">
+                      <p className="text-xs text-ivory-400">
+                        你可以带 1 位朋友加入本次车局，请填写朋友姓名：
+                      </p>
+                      <input
+                        type="text"
+                        value={friendName}
+                        onChange={(e) => setFriendName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleForwardInvite())}
+                        placeholder="请输入朋友姓名"
+                        className="input-field py-2 text-sm"
+                      />
+                      <button
+                        onClick={handleForwardInvite}
+                        disabled={!friendName.trim()}
+                        className="btn-primary w-full py-2 text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        登记转邀
+                      </button>
+                      <p className="text-xs text-ivory-500 text-center">
+                        · 每位受邀玩家仅可转邀 1 位朋友
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg bg-theater-700/50 flex items-center gap-2">
+                        <X className="w-4 h-4 text-ivory-400 flex-shrink-0" />
+                        <span className="text-sm text-ivory-300">
+                          {forwardCheck.reason ?? '暂不可转邀'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-gold-amber/10 border border-gold-amber/30">
+                        <Check className="w-4 h-4 text-gold-amber flex-shrink-0" />
+                        <span className="text-xs text-gold-amber">你的转邀名额状态</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="glass-card p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Crown className="w-4 h-4 text-gold-amber" />
@@ -388,14 +507,6 @@ export const GameDetailPage = () => {
           </div>
         ) : null}
       </div>
-
-      <PasswordModal
-        isOpen={showPasswordModal && !!game}
-        onClose={() => navigate('/')}
-        onSubmit={handlePasswordSubmit}
-        error={passwordError}
-        title={`进入「${game?.title ?? '车局'}」`}
-      />
     </div>
   );
 };

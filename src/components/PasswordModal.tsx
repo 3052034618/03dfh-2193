@@ -7,6 +7,7 @@ interface PasswordModalProps {
   onSubmit: (name: string, password: string) => void;
   error?: string;
   title?: string;
+  standalone?: boolean;
 }
 
 export const PasswordModal = ({
@@ -15,6 +16,7 @@ export const PasswordModal = ({
   onSubmit,
   error,
   title = '进入车局',
+  standalone = false,
 }: PasswordModalProps) => {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -28,8 +30,19 @@ export const PasswordModal = ({
     }
   };
 
+  const Container = ({ children }: { children: React.ReactNode }) => {
+    if (standalone) {
+      return <>{children}</>;
+    }
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+        {children}
+      </div>
+    );
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <Container>
       <div className="glass-card w-full max-w-md p-6 animate-slide-up">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -92,6 +105,6 @@ export const PasswordModal = ({
           本车局为私密邀请制，请确保你已获得车头邀请
         </p>
       </div>
-    </div>
+    </Container>
   );
 };
