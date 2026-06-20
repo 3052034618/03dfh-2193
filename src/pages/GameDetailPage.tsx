@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -48,22 +48,10 @@ export const GameDetailPage = () => {
   const [friendName, setFriendName] = useState('');
   const [showForwardSuccess, setShowForwardSuccess] = useState(false);
 
-  const game = useMemo(() => games.find((g) => g.id === gameId), [games, gameId]);
-
-  const verifiedAccess: VerifiedGameAccess | null = useMemo(
-    () => (gameId ? getVerifiedUserForGame(gameId) : null),
-    [games, gameId, getVerifiedUserForGame, game],
-  );
-
-  const myInvitee = useMemo(
-    () => (gameId ? getMyInviteeInGame(gameId) : null),
-    [games, gameId, getMyInviteeInGame, game],
-  );
-
-  const isHostView = useMemo(
-    () => !!verifiedAccess?.isHost && !!game && verifiedAccess.name === game.hostName,
-    [verifiedAccess, game],
-  );
+  const game = games.find((g) => g.id === gameId);
+  const verifiedAccess: VerifiedGameAccess | null = gameId ? getVerifiedUserForGame(gameId) : null;
+  const myInvitee = gameId ? getMyInviteeInGame(gameId) : null;
+  const isHostView = !!verifiedAccess?.isHost && !!game && verifiedAccess.name === game.hostName;
 
   useEffect(() => {
     init();
@@ -179,10 +167,8 @@ export const GameDetailPage = () => {
   const myRole = myInvitee?.role;
   const myStatus = myInvitee?.status;
 
-  const forwardCheck = useMemo(() => {
-    if (!game || !myInvitee) return { can: false };
-    return canForwardInvite(game.id, myInvitee.name);
-  }, [games, game, myInvitee, canForwardInvite]);
+  const forwardCheck =
+    game && myInvitee ? canForwardInvite(game.id, myInvitee.name) : { can: false };
 
   return (
     <div className="min-h-screen py-8 px-4">
@@ -243,12 +229,6 @@ export const GameDetailPage = () => {
                   <Users className="w-4 h-4 text-gold-amber flex-shrink-0" />
                   <span>{confirmedCount}/{game.requiredPlayers} 人</span>
                 </div>
-                {!isHostView && (
-                  <div className="md:col-span-2 flex items-center gap-2 text-sm text-ivory-300">
-                    <BookOpen className="w-4 h-4 text-gold-amber flex-shrink-0" />
-                    <span>{firstSlot?.date} {firstSlot?.time}</span>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -413,10 +393,10 @@ export const GameDetailPage = () => {
               </div>
 
               {game.permission === 'one-forward' && (
-                <div className="glass-card p-6">
+                <div className={`glass-card p-6 transition-all ${!forwardCheck.can ? 'opacity-60' : ''}`}>
                   <div className="flex items-center gap-2 mb-4">
-                    <UserPlus className="w-4 h-4 text-gold-amber" />
-                    <h3 className="text-base font-semibold text-ivory-100">带朋友加入</h3>
+                    <UserPlus className={`w-4 h-4 ${forwardCheck.can ? 'text-gold-amber' : 'text-ivory-500'}`} />
+                    <h3 className={`text-base font-semibold ${forwardCheck.can ? 'text-ivory-100' : 'text-ivory-500'}`}>带朋友加入</h3>
                   </div>
 
                   {showForwardSuccess && (
@@ -447,21 +427,25 @@ export const GameDetailPage = () => {
                         <UserPlus className="w-4 h-4" />
                         登记转邀
                       </button>
-                      <p className="text-xs text-ivory-500 text-center">
-                        · 每位受邀玩家仅可转邀 1 位朋友
-                      </p>
+                      <div className="flex items-center justify-center gap-1.5 text-xs text-ivory-500">
+                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span>还可以带 1 位朋友</span>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <div className="p-3 rounded-lg bg-theater-700/50 flex items-center gap-2">
-                        <X className="w-4 h-4 text-ivory-400 flex-shrink-0" />
-                        <span className="text-sm text-ivory-300">
-                          {forwardCheck.reason ?? '暂不可转邀'}
-                        </span>
+                      <div className="p-3 rounded-lg bg-theater-700/50 border border-theater-600/40 flex items-start gap-2">
+                        <X className="w-4 h-4 text-ivory-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-ivory-300 mb-0.5">转邀入口已关闭</p>
+                          <p className="text-xs text-ivory-500">
+                            {forwardCheck.reason ?? '暂不可转邀'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 p-2 rounded-lg bg-gold-amber/10 border border-gold-amber/30">
-                        <Check className="w-4 h-4 text-gold-amber flex-shrink-0" />
-                        <span className="text-xs text-gold-amber">你的转邀名额状态</span>
+                      <div className="flex items-center justify-center gap-1.5 text-xs text-ivory-500">
+                        <span className="inline-block w-2 h-2 rounded-full bg-ivory-500"></span>
+                        <span>转邀名额已用完或无权限</span>
                       </div>
                     </div>
                   )}

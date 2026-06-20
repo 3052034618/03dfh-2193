@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Lock, User } from 'lucide-react';
 
 interface PasswordModalProps {
@@ -20,6 +20,13 @@ export const PasswordModal = ({
 }: PasswordModalProps) => {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setName('');
+      setPassword('');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
